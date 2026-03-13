@@ -70,8 +70,8 @@ pkg install termux-api
 # → also install Termux:API app from F-Droid
 
 # 3. Clone & run
-git clone https://github.com/flandreiii/termuxdash
-cd termuxdash
+git clone https://github.com/flandreiii/Useful-termux-tools
+cd Useful-termux-tools
 python app.py
 ```
 
