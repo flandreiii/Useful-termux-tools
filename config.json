@@ -1,0 +1,27 @@
+{
+  "water_reminder": {
+    "enabled": true,
+    "interval_hours": 2,
+    "message": "💧 Time to drink water!"
+  },
+  "battery_warning": {
+    "enabled": true,
+    "threshold": 20,
+    "message": "🔋 Battery low! Plug in your charger."
+  },
+  "weather_alert": {
+    "enabled": true,
+    "check_time": "07:00",
+    "message": "🌤 Good morning! Here's your weather:"
+  },
+  "daily_briefing": {
+    "enabled": true,
+    "time": "08:00",
+    "message": "📋 Good morning! Start your day strong."
+  },
+  "custom_reminders": [
+    {"enabled": true, "time": "09:00", "message": "🧘 Morning stretch time!"},
+    {"enabled": true, "time": "18:00", "message": "🏃 Time for your evening walk!"},
+    {"enabled": true, "time": "22:30", "message": "😴 Time to wind down and sleep."}
+  ]
+}
