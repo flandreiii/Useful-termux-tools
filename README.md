@@ -70,7 +70,7 @@ pkg install termux-api
 # → also install Termux:API app from F-Droid
 
 # 3. Clone & run
-git clone https://github.com/flandreiii/Useful-termux-tools
+git clone https://github.com/flandreiii/Useful-termux-tools.git
 cd Useful-termux-tools
 python app.py
 ```
@@ -144,7 +144,7 @@ pip install schedule requests
 # → also install Termux:API app from F-Droid
 
 # 2. Clone & run
-git clone https://github.com/flandreiii/termuxnotify
+git clone https://github.com/flandreiii/Useful-termux-tools.git
 cd termuxnotify
 python notify_bot.py
 ```
