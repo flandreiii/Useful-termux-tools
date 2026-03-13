@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>TermuxDash</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg:       #090c10;
+    --surface:  #0d1117;
+    --border:   #1e2a38;
+    --glow:     #00e5ff;
+    --glow2:    #00ff9f;
+    --warn:     #ffaa00;
+    --danger:   #ff3d5a;
+    --text:     #c8d8e8;
+    --muted:    #4a6080;
+    --mono:     'Share Tech Mono', monospace;
+    --sans:     'Rajdhani', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* scanline overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,229,255,0.015) 2px,
+      rgba(0,229,255,0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  /* grid noise bg */
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Header ──────────────────────────────────────────── */
+  header {
+    position: relative; z-index: 10;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(13,17,23,0.95);
+    backdrop-filter: blur(10px);
+  }
+
+  .logo {
+    font-family: var(--mono);
+    font-size: 1.1rem;
+    color: var(--glow);
+    text-shadow: 0 0 12px var(--glow);
+    letter-spacing: 3px;
+  }
+
+  .logo span { color: var(--glow2); }
+
+  #clock {
+    font-family: var(--mono);
+    font-size: 1.3rem;
+    color: var(--glow);
+    text-shadow: 0 0 10px var(--glow);
+    letter-spacing: 2px;
+  }
+
+  #date-str {
+    font-size: 0.75rem;
+    color: var(--muted);
+    text-align: right;
+    letter-spacing: 1px;
+    margin-top: 2px;
+    text-transform: uppercase;
+  }
+
+  /* ── Layout ──────────────────────────────────────────── */
+  main {
+    position: relative; z-index: 10;
+    padding: 16px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px;
+    position: relative;
+    overflow: hidden;
+    animation: fadeIn 0.5s ease both;
+  }
+
+  .card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--glow), transparent);
+    opacity: 0.4;
+  }
+
+  .card.full { grid-column: 1 / -1; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .card-label {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    color: var(--muted);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  /* ── Battery ─────────────────────────────────────────── */
+  .battery-row {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .battery-icon {
+    width: 36px; height: 20px;
+    border: 2px solid var(--glow);
+    border-radius: 3px;
+    position: relative;
+    flex-shrink: 0;
+    box-shadow: 0 0 8px rgba(0,229,255,0.3);
+  }
+
+  .battery-icon::after {
+    content: '';
+    position: absolute; right: -5px; top: 50%;
+    transform: translateY(-50%);
+    width: 3px; height: 8px;
+    background: var(--glow);
+    border-radius: 0 2px 2px 0;
+  }
+
+  .battery-fill {
+    position: absolute; inset: 2px;
+    border-radius: 1px;
+    transition: width 0.6s ease;
+    background: var(--glow2);
+    box-shadow: 0 0 6px var(--glow2);
+  }
+
+  .battery-pct {
+    font-family: var(--mono);
+    font-size: 1.6rem;
+    color: var(--glow2);
+    text-shadow: 0 0 10px var(--glow2);
+  }
+
+  .battery-status {
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 2px;
+  }
+
+  .battery-temp {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    color: var(--warn);
+    margin-top: 4px;
+  }
+
+  /* ── Progress bar ────────────────────────────────────── */
+  .prog-row {
+    margin-bottom: 8px;
+  }
+
+  .prog-header {
+    display: flex; justify-content: space-between;
+    font-size: 0.75rem; margin-bottom: 4px;
+    color: var(--muted);
+  }
+
+  .prog-header span:last-child {
+    font-family: var(--mono);
+    color: var(--text);
+  }
+
+  .prog-bar {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .prog-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--glow2), var(--glow));
+    box-shadow: 0 0 6px var(--glow);
+    transition: width 0.6s ease;
+  }
+
+  .prog-fill.warn { background: linear-gradient(90deg, var(--warn), #ff6600); box-shadow: 0 0 6px var(--warn); }
+  .prog-fill.danger { background: linear-gradient(90deg, var(--danger), #ff0055); box-shadow: 0 0 6px var(--danger); }
+
+  /* ── Uptime ──────────────────────────────────────────── */
+  #uptime-val {
+    font-family: var(--mono);
+    font-size: 1.4rem;
+    color: var(--glow);
+    text-shadow: 0 0 10px var(--glow);
+    letter-spacing: 2px;
+    margin-top: 4px;
+  }
+
+  /* ── Weather ─────────────────────────────────────────── */
+  .weather-main {
+    display: flex; align-items: flex-end; gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .weather-temp {
+    font-family: var(--mono);
+    font-size: 2.4rem;
+    color: var(--glow);
+    text-shadow: 0 0 12px var(--glow);
+    line-height: 1;
+  }
+
+  .weather-temp sup { font-size: 1rem; vertical-align: super; }
+
+  .weather-desc {
+    font-size: 0.85rem;
+    color: var(--text);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    line-height: 1.4;
+  }
+
+  .weather-meta {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+
+  .weather-meta-item {
+    background: rgba(0,229,255,0.05);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 6px 8px;
+    text-align: center;
+  }
+
+  .weather-meta-item .label {
+    font-size: 0.55rem;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 2px;
+  }
+
+  .weather-meta-item .val {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    color: var(--glow2);
+  }
+
+  .hourly {
+    display: flex; gap: 6px; overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .hourly::-webkit-scrollbar { height: 2px; }
+  .hourly::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .hour-item {
+    flex-shrink: 0;
+    text-align: center;
+    background: rgba(0,229,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 6px 10px;
+  }
+
+  .hour-item .h-time { font-size: 0.6rem; color: var(--muted); letter-spacing: 1px; }
+  .hour-item .h-temp { font-family: var(--mono); font-size: 0.85rem; color: var(--glow); margin-top: 2px; }
+
+  /* ── Todos ───────────────────────────────────────────── */
+  .todo-input-row {
+    display: flex; gap: 8px; margin-bottom: 12px;
+  }
+
+  .todo-input {
+    flex: 1;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px 10px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .todo-input:focus { border-color: var(--glow); box-shadow: 0 0 8px rgba(0,229,255,0.15); }
+  .todo-input::placeholder { color: var(--muted); }
+
+  .btn {
+    background: rgba(0,229,255,0.1);
+    border: 1px solid var(--glow);
+    color: var(--glow);
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.2s;
+    box-shadow: 0 0 8px rgba(0,229,255,0.1);
+  }
+
+  .btn:hover { background: rgba(0,229,255,0.2); box-shadow: 0 0 14px rgba(0,229,255,0.3); }
+  .btn:active { transform: scale(0.97); }
+
+  .todo-list { list-style: none; max-height: 220px; overflow-y: auto; }
+  .todo-list::-webkit-scrollbar { width: 2px; }
+  .todo-list::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .todo-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 6px;
+    border-bottom: 1px solid rgba(30,42,56,0.5);
+    cursor: pointer;
+    transition: background 0.15s;
+    border-radius: 4px;
+  }
+
+  .todo-item:hover { background: rgba(0,229,255,0.04); }
+
+  .todo-check {
+    width: 14px; height: 14px;
+    border: 1px solid var(--muted);
+    border-radius: 2px;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+  }
+
+  .todo-item.done .todo-check {
+    border-color: var(--glow2);
+    background: rgba(0,255,159,0.15);
+  }
+
+  .todo-item.done .todo-check::after {
+    content: '✓';
+    font-size: 0.65rem;
+    color: var(--glow2);
+  }
+
+  .todo-text {
+    flex: 1;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+    transition: all 0.2s;
+  }
+
+  .todo-item.done .todo-text {
+    color: var(--muted);
+    text-decoration: line-through;
+  }
+
+  .todo-date { font-size: 0.6rem; color: var(--muted); font-family: var(--mono); white-space: nowrap; }
+
+  .todo-del {
+    background: none; border: none;
+    color: var(--muted); cursor: pointer;
+    font-size: 0.9rem; padding: 2px 4px;
+    border-radius: 3px;
+    transition: color 0.2s;
+    line-height: 1;
+  }
+
+  .todo-del:hover { color: var(--danger); }
+
+  .empty-msg {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.75rem;
+    letter-spacing: 2px;
+    padding: 20px 0;
+    font-family: var(--mono);
+  }
+
+  /* ── Loading pulse ───────────────────────────────────── */
+  .skeleton {
+    background: linear-gradient(90deg, var(--border) 25%, rgba(255,255,255,0.04) 50%, var(--border) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 3px;
+    height: 14px;
+    width: 80%;
+  }
+
+  @keyframes shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* ── Error ───────────────────────────────────────────── */
+  .err { color: var(--danger); font-family: var(--mono); font-size: 0.75rem; letter-spacing: 1px; }
+
+  @media (max-width: 480px) {
+    main { grid-template-columns: 1fr; }
+    .card.full { grid-column: 1; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">TERMUX<span>DASH</span></div>
+  <div>
+    <div id="clock">--:--:--</div>
+    <div id="date-str">Loading...</div>
+  </div>
+</header>
+
+<main>
+
+  <!-- Battery -->
+  <div class="card" style="animation-delay:0.05s">
+    <div class="card-label">// battery</div>
+    <div class="battery-row">
+      <div class="battery-icon">
+        <div class="battery-fill" id="bat-fill" style="width:50%"></div>
+      </div>
+      <div class="battery-pct" id="bat-pct">--%</div>
+    </div>
+    <div class="battery-status" id="bat-status">UNKNOWN</div>
+    <div class="battery-temp" id="bat-temp">🌡 --°C</div>
+  </div>
+
+  <!-- Uptime -->
+  <div class="card" style="animation-delay:0.1s">
+    <div class="card-label">// uptime</div>
+    <div id="uptime-val">--h --m</div>
+    <div style="margin-top:12px">
+      <div class="card-label" style="margin-bottom:8px">// memory</div>
+      <div class="prog-row">
+        <div class="prog-header"><span>RAM</span><span id="mem-label">-- / --</span></div>
+        <div class="prog-bar"><div class="prog-fill" id="mem-fill" style="width:0%"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Storage -->
+  <div class="card full" style="animation-delay:0.15s">
+    <div class="card-label">// storage</div>
+    <div class="prog-row">
+      <div class="prog-header"><span>DISK</span><span id="disk-label">-- / --</span></div>
+      <div class="prog-bar"><div class="prog-fill" id="disk-fill" style="width:0%"></div></div>
+    </div>
+    <div style="font-size:0.7rem; color:var(--muted); font-family:var(--mono); margin-top:4px" id="disk-free"></div>
+  </div>
+
+  <!-- Weather -->
+  <div class="card full" style="animation-delay:0.2s">
+    <div class="card-label">// weather</div>
+    <div id="weather-body">
+      <div class="skeleton" style="margin-bottom:8px"></div>
+      <div class="skeleton" style="width:60%"></div>
+    </div>
+  </div>
+
+  <!-- Todos -->
+  <div class="card full" style="animation-delay:0.25s">
+    <div class="card-label">// todos &amp; reminders</div>
+    <div class="todo-input-row">
+      <input class="todo-input" id="todo-input" type="text" placeholder="Add a task..." maxlength="120"/>
+      <button class="btn" onclick="addTodo()">+ ADD</button>
+    </div>
+    <ul class="todo-list" id="todo-list">
+      <li class="empty-msg">no tasks yet</li>
+    </ul>
+  </div>
+
+</main>
+
+<script>
+// ── Clock ───────────────────────────────────────────────────────
+function tickClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toTimeString().slice(0,8);
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+// ── Stats ───────────────────────────────────────────────────────
+async function fetchStats() {
+  try {
+    const r = await fetch('/api/stats');
+    const d = await r.json();
+
+    // date
+    document.getElementById('date-str').textContent = d.date;
+
+    // battery
+    const pct = d.battery.percentage || 0;
+    document.getElementById('bat-pct').textContent = pct + '%';
+    document.getElementById('bat-status').textContent = d.battery.status || 'UNKNOWN';
+    document.getElementById('bat-temp').textContent = '🌡 ' + (d.battery.temperature || '--') + '°C';
+    const fill = document.getElementById('bat-fill');
+    fill.style.width = pct + '%';
+    fill.style.background = pct < 20 ? 'var(--danger)' : pct < 50 ? 'var(--warn)' : 'var(--glow2)';
+    fill.style.boxShadow = `0 0 6px ${pct < 20 ? 'var(--danger)' : pct < 50 ? 'var(--warn)' : 'var(--glow2)'}`;
+
+    // uptime
+    document.getElementById('uptime-val').textContent = d.uptime;
+
+    // memory
+    const memPct = d.memory.percent || 0;
+    document.getElementById('mem-label').textContent = `${d.memory.used} / ${d.memory.total}`;
+    const mf = document.getElementById('mem-fill');
+    mf.style.width = memPct + '%';
+    mf.className = 'prog-fill' + (memPct > 85 ? ' danger' : memPct > 65 ? ' warn' : '');
+
+    // storage
+    const diskPctStr = d.storage.percent || '0%';
+    const diskPct = parseInt(diskPctStr);
+    document.getElementById('disk-label').textContent = `${d.storage.used} / ${d.storage.total}`;
+    document.getElementById('disk-free').textContent = `free: ${d.storage.free}`;
+    const df = document.getElementById('disk-fill');
+    df.style.width = diskPctStr;
+    df.className = 'prog-fill' + (diskPct > 85 ? ' danger' : diskPct > 65 ? ' warn' : '');
+
+  } catch(e) {
+    console.error('Stats error', e);
+  }
+}
+
+fetchStats();
+setInterval(fetchStats, 15000);
+
+// ── Weather ─────────────────────────────────────────────────────
+async function fetchWeather() {
+  const el = document.getElementById('weather-body');
+  try {
+    const r = await fetch('/api/weather');
+    const d = await r.json();
+    if (d.error) { el.innerHTML = `<div class="err">⚠ ${d.error}</div>`; return; }
+
+    let hourly = d.hourly.map(h =>
+      `<div class="hour-item">
+        <div class="h-time">${h.time}</div>
+        <div class="h-temp">${h.temp}°</div>
+      </div>`
+    ).join('');
+
+    el.innerHTML = `
+      <div class="weather-main">
+        <div class="weather-temp">${d.temp}<sup>°C</sup></div>
+        <div>
+          <div class="weather-desc">${d.desc}</div>
+          <div style="font-size:0.7rem;color:var(--muted);margin-top:4px;font-family:var(--mono)">
+            feels ${d.feels}°C
+          </div>
+        </div>
+      </div>
+      <div class="weather-meta">
+        <div class="weather-meta-item"><span class="label">humidity</span><span class="val">${d.humidity}%</span></div>
+        <div class="weather-meta-item"><span class="label">high/low</span><span class="val">${d.max}°/${d.min}°</span></div>
+        <div class="weather-meta-item"><span class="label">sunset</span><span class="val">${d.sunset}</span></div>
+      </div>
+      <div class="hourly">${hourly}</div>
+    `;
+  } catch(e) {
+    el.innerHTML = `<div class="err">⚠ could not load weather</div>`;
+  }
+}
+
+fetchWeather();
+setInterval(fetchWeather, 5 * 60 * 1000);
+
+// ── Todos ────────────────────────────────────────────────────────
+async function fetchTodos() {
+  const r = await fetch('/api/todos');
+  renderTodos(await r.json());
+}
+
+function renderTodos(todos) {
+  const ul = document.getElementById('todo-list');
+  if (!todos.length) {
+    ul.innerHTML = '<li class="empty-msg">no tasks yet</li>';
+    return;
+  }
+  ul.innerHTML = todos.map(t => `
+    <li class="todo-item ${t.done ? 'done' : ''}" onclick="toggleTodo(${t.id})">
+      <div class="todo-check"></div>
+      <span class="todo-text">${escHtml(t.text)}</span>
+      <span class="todo-date">${t.created}</span>
+      <button class="todo-del" onclick="delTodo(event,${t.id})">✕</button>
+    </li>
+  `).join('');
+}
+
+async function addTodo() {
+  const inp = document.getElementById('todo-input');
+  const text = inp.value.trim();
+  if (!text) return;
+  inp.value = '';
+  const r = await fetch('/api/todos', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({text})
+  });
+  renderTodos(await r.json());
+}
+
+async function toggleTodo(id) {
+  const r = await fetch(`/api/todos/${id}/toggle`, {method:'POST'});
+  renderTodos(await r.json());
+}
+
+async function delTodo(e, id) {
+  e.stopPropagation();
+  const r = await fetch(`/api/todos/${id}`, {method:'DELETE'});
+  renderTodos(await r.json());
+}
+
+document.getElementById('todo-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') addTodo();
+});
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+fetchTodos();
+</script>
+</body>
+</html>
